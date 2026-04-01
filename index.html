@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catatan Diamond • Lokal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        body { font-family: 'Inter', system_ui, sans-serif; }
+        .section { display: none; }
+        .section.active { display: block; }
+        .nav-item { transition: all 0.2s; }
+        .nav-item:hover { background-color: #f1f5f9; }
+        .nav-item.active { background-color: #0ea5e9; color: white; }
+        
+        /* RESPONSIVE & UI FRIENDLY */
+        .main-layout { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        @media (min-width: 1024px) {
+            .main-layout { flex-direction: row; }
+        }
+        .sidebar { width: 100%; max-height: 60px; }
+        @media (min-width: 1024px) {
+            .sidebar { width: 280px; max-height: none; }
+        }
+        .content-area { flex: 1; overflow-y: auto; padding: 1rem; }
+        @media (min-width: 1024px) {
+            .content-area { padding: 2rem; }
+        }
+        .card-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+        .form-card { max-width: 100%; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-800">
+    <div class="main-layout">
+        <!-- SIDEBAR -->
+        <div class="sidebar bg-white border-r border-slate-200 flex flex-col shadow-xl">
+            <div class="px-6 py-6 border-b border-slate-100 flex items-center gap-3">
+                <div class="w-9 h-9 bg-sky-500 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">💎</div>
+                <div>
+                    <h1 class="text-2xl font-semibold tracking-tight">Catatan Diamond</h1>
+                    <p class="text-xs text-slate-500">Jalankan lokal di komputer</p>
+                </div>
+            </div>
+
+            <div class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+                <button onclick="showSection('dashboard')" class="nav-item active w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left font-medium" id="nav-dashboard">
+                    <span class="text-lg">🏠</span> Dashboard
+                </button>
+                <button onclick="showSection('pemasukan')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left font-medium" id="nav-pemasukan">
+                    <span class="text-lg">📥</span> Pemasukan
+                </button>
+                <button onclick="showSection('pengeluaran')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left font-medium" id="nav-pengeluaran">
+                    <span class="text-lg">📤</span> Pengeluaran
+                </button>
+                <button onclick="showSection('stok')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left font-medium" id="nav-stok">
+                    <span class="text-lg">📦</span> Stok Diamond
+                </button>
+                <button onclick="showSection('reseller')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left font-medium" id="nav-reseller">
+                    <span class="text-lg">👥</span> Reseller / User
+                </button>
+                <button onclick="showSection('rekap')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left font-medium" id="nav-rekap">
+                    <span class="text-lg">📅</span> Rekap Harian & Bulanan
+                </button>
+            </div>
+
+            <div class="px-6 py-6 border-t border-slate-100 text-xs">
+                <div class="mb-3">Data tersimpan otomatis di browser</div>
+                <div class="text-[10px] bg-slate-50 p-3 rounded-2xl leading-tight">
+                    <strong>Cara pindah ke komputer lain:</strong><br>
+                    1. Klik <span class="font-medium">Export JSON</span><br>
+                    2. Simpan file .json di USB / Google Drive / Email<br>
+                    3. Buka website di komputer baru<br>
+                    4. Klik <span class="font-medium">Import JSON</span><br>
+                    Semua transaksi, stok, dan rekap akan ikut pindah 100%
+                </div>
+                <button onclick="resetData()" class="mt-4 w-full text-red-500 hover:text-red-600 flex items-center justify-center gap-2 py-2 text-xs font-medium">
+                    <span>🗑️</span> Reset Semua Data
+                </button>
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <div class="content-area flex-1 flex flex-col overflow-hidden bg-slate-950">
+            <!-- HEADER -->
+            <div class="h-14 border-b border-slate-200 bg-white px-4 flex items-center justify-between shadow-sm">
+                <h2 id="page-title" class="text-2xl font-semibold text-slate-800">Dashboard</h2>
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-2 text-sm text-slate-500">
+                        <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                        Berjalan Lokal
+                    </div>
+                    <div onclick="exportData()" class="cursor-pointer flex items-center gap-1 text-sky-600 hover:text-sky-700 text-sm font-medium">
+                        📤 Export JSON
+                    </div>
+                    <div onclick="importData()" class="cursor-pointer flex items-center gap-1 text-sky-600 hover:text-sky-700 text-sm font-medium">
+                        📥 Import JSON
+                    </div>
+                </div>
+            </div>
+
+            <!-- DASHBOARD -->
+            <div id="dashboard" class="section active flex-1 overflow-y-auto p-4 lg:p-8">
+                <div class="card-grid grid gap-4 lg:gap-6">
+                    <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+                        <div class="text-slate-500 text-sm">Saldo Saat Ini</div>
+                        <div id="saldo-value" class="text-4xl font-semibold text-emerald-600 mt-2">Rp 0</div>
+                        <div class="text-xs text-emerald-500 mt-1">+ Profit bersih</div>
+                    </div>
+                    <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+                        <div class="text-slate-500 text-sm">Total Pemasukan</div>
+                        <div id="total-pemasukan" class="text-4xl font-semibold text-emerald-600 mt-2">Rp 0</div>
+                        <div id="total-diamond-jual" class="text-xs text-slate-500 mt-1">0 diamond terjual</div>
+                    </div>
+                    <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+                        <div class="text-slate-500 text-sm">Total Pengeluaran</div>
+                        <div id="total-pengeluaran" class="text-4xl font-semibold text-red-600 mt-2">Rp 0</div>
+                    </div>
+                    <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+                        <div class="text-slate-500 text-sm">Stok Diamond</div>
+                        <div id="stok-value" class="text-4xl font-semibold text-amber-600 mt-2">0</div>
+                        <div class="text-xs text-amber-500 mt-1">unit tersisa</div>
+                    </div>
+                    <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+                        <div class="text-slate-500 text-sm">Total Omset</div>
+                        <div id="total-omset" class="text-4xl font-semibold text-blue-600 mt-2">Rp 0</div>
+                        <div class="text-xs text-blue-500 mt-1">Total harga penjualan</div>
+                    </div>
+                </div>
+
+                <div class="mt-8 bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+                    <h3 class="font-semibold mb-4">Analisis 30 Hari Terakhir</h3>
+                    <canvas id="miniChart" class="h-64 w-full"></canvas>
+                </div>
+
+                <div class="mt-8">
+                    <div class="flex justify-between mb-4 items-center">
+                        <h3 class="font-semibold">Transaksi Terbaru</h3>
+                        <a onclick="showSection('laporan')" class="text-sky-600 text-sm cursor-pointer">Lihat semua →</a>
+                    </div>
+                    <div id="recent-table" class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"></div>
+                </div>
+            </div>
+
+            <!-- PEMASUKAN -->
+            <div id="pemasukan" class="section flex-1 overflow-y-auto p-4 lg:p-8">
+                <div class="form-card mx-auto max-w-xl bg-white rounded-3xl shadow-sm p-8">
+                    <h2 class="text-2xl font-semibold mb-6">Tambah Pemasukan (Penjualan Diamond)</h2>
+                    <div class="space-y-6">
+                        <div>
+                            <label class="block text-sm text-slate-500 mb-1">Tanggal</label>
+                            <input type="date" id="pemasukan-tgl" class="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:border-sky-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-500 mb-1">Reseller / User</label>
+                            <div class="flex gap-2">
+                                <select id="pemasukan-reseller" class="flex-1 px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:border-sky-500"></select>
+                                <button onclick="tambahResellerSekarang()" class="px-6 bg-slate-800 text-white rounded-2xl text-sm font-medium">+ Tambah</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm text-slate-500 mb-1">Jumlah Diamond</label>
+                                <input type="number" id="pemasukan-diamond" placeholder="Contoh: 100" class="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:border-sky-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-slate-500 mb-1">Nama Pembeli</label>
+                                <input type="text" id="pemasukan-buyer" placeholder="Nama pembeli" class="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:border-sky-500">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-500 mb-1">Harga Jual (Rp)</label>
+                            <input type="number" id="pemasukan-hargajual" placeholder="Total harga yang dibayar pembeli" class="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:border-sky-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-500 mb-1">Profit (Rp)</label>
+                            <input type="number" id="pemasukan-profit" placeholder="Profit bersih dari transaksi ini" class="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:border-sky-500">
+                        </div>
+                        <button onclick="simpanPemasukan()" class="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-3xl text-lg transition">✅ Simpan Pemasukan</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PENGELUARAN -->
+            <div id="pengeluaran" class="section flex-1 overflow-y-auto p-4 lg:p-8">
+                <div class="form-card mx-auto max-w-xl bg-white rounded-3xl shadow-sm p-8">
+                    <h2 class="text-2xl font-semibold mb-6">Tambah Pengeluaran</h2>
+                    <div class="space-y-6">
+                        <div>
+                            <label class="block text-sm text-slate-500 mb-1">Tanggal</label>
+                            <input type="date" id="pengeluaran-tgl" class="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:border-sky-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-500 mb-1">Jumlah Pengeluaran (Rp)</label>
+                            <input type="number" id="pengeluaran-jumlah" placeholder="Contoh: 50000" class="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:border-sky-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-500 mb-1">Keterangan</label>
+                            <input type="text" id="pengeluaran-keterangan" placeholder="Beli pulsa, bayar listrik, dll" class="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:border-sky-500">
+                        </div>
+                        <button onclick="simpanPengeluaran()" class="w-full py-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-3xl text-lg transition">✅ Simpan Pengeluaran</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STOK -->
+            <div id="stok" class="section flex-1 overflow-y-auto p-4 lg:p-8">
+                <div class="form-card mx-auto max-w-lg bg-white rounded-3xl shadow-sm p-8">
+                    <h2 class="text-2xl font-semibold mb-2">Stok Diamond Saat Ini</h2>
+                    <div id="stok-besar" class="text-7xl font-bold text-amber-600 mb-8">0</div>
+                    <div class="border border-dashed border-slate-300 rounded-3xl p-6">
+                        <h3 class="font-medium mb-4">Tambah Stok Diamond</h3>
+                        <div class="flex gap-4">
+                            <input type="number" id="tambah-stok-jumlah" placeholder="Jumlah diamond" class="flex-1 px-4 py-3 border border-slate-300 rounded-2xl">
+                            <button onclick="tambahStok()" class="px-10 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-2xl">Tambah</button>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-3">Stok akan otomatis berkurang saat ada transaksi pemasukan</p>
+                    </div>
+                    <div class="mt-10">
+                        <h3 class="font-medium mb-3">Riwayat Stok</h3>
+                        <div id="riwayat-stok" class="text-sm max-h-80 overflow-auto"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RESELLER -->
+            <div id="reseller" class="section flex-1 overflow-y-auto p-4 lg:p-8">
+                <div class="form-card mx-auto max-w-xl bg-white rounded-3xl shadow-sm p-8">
+                    <div class="flex justify-between mb-6">
+                        <h2 class="text-2xl font-semibold">Daftar Reseller / User</h2>
+                        <button onclick="tambahResellerModal()" class="px-5 py-2 bg-slate-800 text-white text-sm font-medium rounded-2xl">+ Tambah Reseller Baru</button>
+                    </div>
+                    <div id="list-reseller" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- LAPORAN -->
+            <div id="laporan" class="section flex-1 overflow-y-auto p-4 lg:p-8">
+                <div class="max-w-6xl mx-auto">
+                    <div class="bg-white rounded-3xl p-6 shadow-sm mb-8">
+                        <h3 class="font-semibold mb-4">Analisis Keuangan (Pemasukan vs Pengeluaran)</h3>
+                        <canvas id="mainChart" class="h-96 w-full"></canvas>
+                    </div>
+                    <div class="bg-white rounded-3xl p-6 shadow-sm mb-8">
+                        <h3 class="font-semibold mb-4">Persentase Pemasukan vs Pengeluaran</h3>
+                        <div class="flex justify-center">
+                            <canvas id="pieChart" class="h-80 w-80"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-3xl p-6 shadow-sm">
+                        <h3 class="font-semibold mb-4">Semua Transaksi</h3>
+                        <table class="w-full text-sm" id="full-table">
+                            <thead class="border-b">
+                                <tr class="text-left text-slate-500">
+                                    <th class="pb-3">Tanggal</th>
+                                    <th class="pb-3">Tipe</th>
+                                    <th class="pb-3">Keterangan</th>
+                                    <th class="pb-3 text-right">Jumlah</th>
+                                    <th class="pb-3 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body" class="divide-y"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REKAP -->
+            <div id="rekap" class="section flex-1 overflow-y-auto p-4 lg:p-8">
+                <div class="max-w-6xl mx-auto">
+                    <h2 class="text-3xl font-semibold mb-8">Rekap Penjualan Harian & Bulanan</h2>
+                    <div class="mb-8 bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+                        <div class="flex items-center gap-3">
+                            <div class="text-lg">🗄️</div>
+                            <div>
+                                <h3 class="font-semibold">Database Lokal – Bisa Dipindah Antar Komputer</h3>
+                                <p class="text-sm text-slate-600">Semua data disimpan di browser (localStorage). Pindah komputer cukup Export JSON → simpan file → Import di komputer baru.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
+                            <h3 class="font-semibold text-lg mb-6">Hari Ini</h3>
+                            <div class="grid grid-cols-2 gap-6">
+                                <div><div class="text-xs text-slate-500">Omset Harian</div><div id="omset-harian" class="text-4xl font-semibold text-blue-600 mt-1">Rp 0</div></div>
+                                <div><div class="text-xs text-slate-500">Profit Harian</div><div id="profit-harian" class="text-4xl font-semibold text-emerald-600 mt-1">Rp 0</div></div>
+                                <div><div class="text-xs text-slate-500">Pengeluaran Harian</div><div id="pengeluaran-harian" class="text-4xl font-semibold text-red-600 mt-1">Rp 0</div></div>
+                                <div><div class="text-xs text-slate-500">Stok Terpakai Harian</div><div id="stok-harian" class="text-4xl font-semibold text-amber-600 mt-1">0 diamond</div></div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
+                            <h3 class="font-semibold text-lg mb-6">Bulan Ini</h3>
+                            <div class="grid grid-cols-2 gap-6">
+                                <div><div class="text-xs text-slate-500">Omset Bulanan</div><div id="omset-bulanan" class="text-4xl font-semibold text-blue-600 mt-1">Rp 0</div></div>
+                                <div><div class="text-xs text-slate-500">Profit Bulanan</div><div id="profit-bulanan" class="text-4xl font-semibold text-emerald-600 mt-1">Rp 0</div></div>
+                                <div><div class="text-xs text-slate-500">Pengeluaran Bulanan</div><div id="pengeluaran-bulanan" class="text-4xl font-semibold text-red-600 mt-1">Rp 0</div></div>
+                                <div><div class="text-xs text-slate-500">Stok Terpakai Bulanan</div><div id="stok-bulanan" class="text-4xl font-semibold text-amber-600 mt-1">0 diamond</div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-10 bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
+                        <h3 class="font-semibold mb-6">Detail Rekap Harian (7 Hari Terakhir)</h3>
+                        <table class="w-full text-sm" id="table-rekap-harian">
+                            <thead class="border-b">
+                                <tr class="text-left text-slate-500">
+                                    <th class="pb-4">Tanggal</th>
+                                    <th class="pb-4 text-right">Omset</th>
+                                    <th class="pb-4 text-right">Profit</th>
+                                    <th class="pb-4 text-right">Pengeluaran</th>
+                                    <th class="pb-4 text-right">Stok Terpakai</th>
+                                </tr>
+                            </thead>
+                            <tbody id="body-rekap-harian" class="divide-y"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+    <div id="modal-reseller" onclick="if(event.target===this)hideModal()" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div onclick="event.stopImmediatePropagation()" class="bg-white rounded-3xl p-8 w-96">
+            <h3 class="text-xl font-semibold mb-4">Tambah Reseller Baru</h3>
+            <input id="modal-reseller-input" type="text" placeholder="Nama reseller / user" class="w-full px-4 py-3 border border-slate-300 rounded-2xl mb-6">
+            <div class="flex gap-3">
+                <button onclick="hideModal()" class="flex-1 py-3 border border-slate-300 rounded-2xl">Batal</button>
+                <button onclick="simpanResellerModal()" class="flex-1 py-3 bg-slate-800 text-white rounded-2xl">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-modal" onclick="if(event.target===this)hideEditModal()" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+        <div onclick="event.stopImmediatePropagation()" class="bg-white rounded-3xl p-8 w-full max-w-lg">
+            <h3 class="text-xl font-semibold mb-6" id="modal-title">Edit Transaksi</h3>
+            <div id="edit-content" class="space-y-6"></div>
+        </div>
+    </div>
+
+    <script>
+        // ================== KONFIGURASI TAILWIND ==================
+        function initTailwind() {
+            tailwind.config = { content: [], theme: { extend: {} } }
+        }
+
+        // ================== DATA & LOCALSTORAGE ==================
+        let transactions = []
+        let resellers = ["Default Reseller", "Reseller A", "Reseller B"]
+        let stock = 500
+        let stockHistory = []
+
+        const STORAGE_KEY = 'diamond_catatan_v1'
+
+        function loadData() {
+            const saved = localStorage.getItem(STORAGE_KEY)
+            if (saved) {
+                const data = JSON.parse(saved)
+                transactions = data.transactions || []
+                resellers = data.resellers || resellers
+                stock = data.stock || stock
+                stockHistory = data.stockHistory || []
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ transactions, resellers, stock, stockHistory }))
+        }
+
+        function resetData() {
+            if (confirm('Reset semua data? (tidak bisa dibatalkan)')) {
+                localStorage.removeItem(STORAGE_KEY)
+                location.reload()
+            }
+        }
+
+        // ================== HELPER ==================
+        function formatRupiah(num) {
+            return 'Rp ' + Number(num).toLocaleString('id-ID')
+        }
+
+        function formatDate(dateStr) {
+            const d = new Date(dateStr)
+            return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+        }
+
+        function calculateSaldo() {
+            let pemasukan = 0, pengeluaran = 0, diamondTerjual = 0, omset = 0
+            transactions.forEach(t => {
+                if (t.type === 'pemasukan') {
+                    pemasukan += Number(t.profit || 0)
+                    diamondTerjual += Number(t.diamonds || 0)
+                    omset += Number(t.hargaJual || 0)
+                } else {
+                    pengeluaran += Number(t.amount || 0)
+                }
+            })
+            return { saldo: pemasukan - pengeluaran, pemasukan, pengeluaran, diamondTerjual, omset }
+        }
+
+        // ================== NAVIGASI ==================
+        function showSection(section) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'))
+            document.getElementById(section).classList.add('active')
+            document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'))
+            const activeNav = document.getElementById('nav-' + section)
+            if (activeNav) activeNav.classList.add('active')
+            document.getElementById('page-title').textContent = {
+                dashboard: 'Dashboard', pemasukan: 'Pemasukan', pengeluaran: 'Pengeluaran',
+                stok: 'Stok Diamond', reseller: 'Reseller / User', laporan: 'Grafik & Laporan',
+                rekap: 'Rekap Harian & Bulanan'
+            }[section]
+
+            if (section === 'dashboard') renderDashboard()
+            if (section === 'stok') renderStok()
+            if (section === 'reseller') renderReseller()
+            if (section === 'laporan') renderLaporan()
+            if (section === 'rekap') renderRekap()
+        }
+
+        // ================== PEMASUKAN ==================
+        function populateResellerSelect() {
+            const select = document.getElementById('pemasukan-reseller')
+            select.innerHTML = ''
+            resellers.forEach(r => {
+                const opt = document.createElement('option')
+                opt.value = r
+                opt.textContent = r
+                select.appendChild(opt)
+            })
+        }
+
+        function simpanPemasukan() {
+            const tgl = document.getElementById('pemasukan-tgl').value
+            const reseller = document.getElementById('pemasukan-reseller').value
+            const diamonds = parseInt(document.getElementById('pemasukan-diamond').value) || 0
+            const buyer = document.getElementById('pemasukan-buyer').value.trim()
+            const profit = parseInt(document.getElementById('pemasukan-profit').value) || 0
+            const hargaJual = parseInt(document.getElementById('pemasukan-hargajual').value) || 0
+
+            if (!tgl || !reseller || diamonds <= 0 || profit <= 0) {
+                alert('Mohon isi semua field dengan benar!')
+                return
+            }
+
+            if (stock < diamonds) {
+                if (!confirm('Stok tidak cukup! Lanjutkan?')) return
+            }
+            stock = Math.max(0, stock - diamonds)
+            stockHistory.unshift({ date: tgl, change: -diamonds, note: `Penjualan ke ${buyer} (${reseller})` })
+
+            transactions.unshift({
+                id: Date.now(), type: 'pemasukan', date: tgl, reseller,
+                diamonds, buyer: buyer || '-', profit, hargaJual
+            })
+
+            saveData()
+            alert('✅ Pemasukan berhasil dicatat!')
+            document.getElementById('pemasukan-diamond').value = ''
+            document.getElementById('pemasukan-buyer').value = ''
+            document.getElementById('pemasukan-profit').value = ''
+            document.getElementById('pemasukan-hargajual').value = ''
+            renderDashboard()
+            renderStok()
+            renderLaporan()
+        }
+
+        function tambahResellerSekarang() {
+            const nama = prompt('Nama reseller / user baru:')
+            if (nama && nama.trim() && !resellers.includes(nama.trim())) {
+                resellers.push(nama.trim())
+                saveData()
+                populateResellerSelect()
+                alert('Reseller ditambahkan!')
+            }
+        }
+
+        // ================== PENGELUARAN ==================
+        function simpanPengeluaran() {
+            const tgl = document.getElementById('pengeluaran-tgl').value
+            const jumlah = parseInt(document.getElementById('pengeluaran-jumlah').value) || 0
+            const keterangan = document.getElementById('pengeluaran-keterangan').value.trim()
+            if (!tgl || jumlah <= 0) return alert('Mohon isi tanggal dan jumlah!')
+            transactions.unshift({ id: Date.now(), type: 'pengeluaran', date: tgl, amount: jumlah, description: keterangan || 'Pengeluaran umum' })
+            saveData()
+            alert('✅ Pengeluaran berhasil dicatat!')
+            document.getElementById('pengeluaran-jumlah').value = ''
+            document.getElementById('pengeluaran-keterangan').value = ''
+            renderDashboard()
+            renderLaporan()
+        }
+
+        // ================== STOK ==================
+        function tambahStok() {
+            const jumlah = parseInt(document.getElementById('tambah-stok-jumlah').value) || 0
+            if (jumlah <= 0) return alert('Masukkan jumlah > 0')
+            stock += jumlah
+            stockHistory.unshift({ date: new Date().toISOString().split('T')[0], change: +jumlah, note: 'Restock manual' })
+            saveData()
+            renderStok()
+            alert(`✅ Stok bertambah ${jumlah} diamond`)
+            document.getElementById('tambah-stok-jumlah').value = ''
+        }
+
+        function renderStok() {
+            document.getElementById('stok-besar').textContent = stock
+            let html = `<div class="text-xs text-slate-500 mb-2">Riwayat perubahan stok</div>`
+            stockHistory.slice(0, 15).forEach(h => {
+                const warna = h.change > 0 ? 'text-emerald-600' : 'text-red-600'
+                html += `<div class="flex justify-between py-3 border-b last:border-0 text-sm"><div><span class="font-medium">${formatDate(h.date)}</span> <span class="text-slate-500">${h.note}</span></div><div class="${warna} font-semibold">${h.change > 0 ? '+' : ''}${h.change}</div></div>`
+            })
+            document.getElementById('riwayat-stok').innerHTML = html || `<p class="text-slate-400 italic py-4">Belum ada riwayat stok</p>`
+        }
+
+        // ================== RESELLER ==================
+        function renderReseller() {
+            let html = ''
+            resellers.forEach((r, i) => html += `<div class="flex items-center justify-between px-5 py-4 bg-slate-50 rounded-2xl"><div class="font-medium">${r}</div><button onclick="hapusReseller(${i})" class="text-red-500 text-xs px-3 py-1 hover:bg-red-100 rounded-xl">Hapus</button></div>`)
+            document.getElementById('list-reseller').innerHTML = html || `<p class="italic text-slate-400">Belum ada reseller</p>`
+        }
+
+        function hapusReseller(index) {
+            if (confirm('Hapus reseller ini?')) {
+                resellers.splice(index, 1)
+                saveData()
+                renderReseller()
+                populateResellerSelect()
+            }
+        }
+
+        function tambahResellerModal() {
+            document.getElementById('modal-reseller').classList.remove('hidden')
+            document.getElementById('modal-reseller-input').focus()
+        }
+
+        function hideModal() {
+            document.getElementById('modal-reseller').classList.add('hidden')
+        }
+
+        function simpanResellerModal() {
+            const input = document.getElementById('modal-reseller-input').value.trim()
+            if (input && !resellers.includes(input)) {
+                resellers.push(input)
+                saveData()
+                renderReseller()
+                populateResellerSelect()
+            }
+            hideModal()
+            document.getElementById('modal-reseller-input').value = ''
+        }
+
+        // ================== DASHBOARD ==================
+        function renderDashboard() {
+            const calc = calculateSaldo()
+            document.getElementById('saldo-value').innerHTML = `<span class="text-emerald-600">${formatRupiah(calc.saldo)}</span>`
+            document.getElementById('total-pemasukan').innerHTML = `<span class="text-emerald-600">${formatRupiah(calc.pemasukan)}</span>`
+            document.getElementById('total-diamond-jual').innerHTML = `<span class="text-emerald-500">${calc.diamondTerjual} diamond terjual</span>`
+            document.getElementById('total-pengeluaran').innerHTML = `<span class="text-red-600">${formatRupiah(calc.pengeluaran)}</span>`
+            document.getElementById('stok-value').textContent = stock
+            document.getElementById('total-omset').innerHTML = `<span class="text-blue-600">${formatRupiah(calc.omset)}</span>`
+
+            let html = `<table class="w-full"><thead><tr class="bg-slate-100 text-xs text-slate-500"><th class="py-4 px-6 text-left">Tanggal</th><th class="py-4 px-6 text-left">Tipe</th><th class="py-4 px-6 text-left">Detail</th><th class="py-4 px-6 text-right">Nilai</th><th class="py-4 px-6 text-center">Aksi</th></tr></thead><tbody>`
+            transactions.slice(0, 8).forEach(t => {
+                if (t.type === 'pemasukan') {
+                    html += `<tr class="border-b last:border-0"><td class="px-6 py-4">${formatDate(t.date)}</td><td class="px-6 py-4"><span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-3xl text-xs">PEMASUKAN</span></td><td class="px-6 py-4">${t.diamonds} DM → ${t.buyer} (${t.reseller})</td><td class="px-6 py-4 text-right font-semibold text-emerald-600">${formatRupiah(t.profit)}</td><td class="px-6 py-4 text-center"><button onclick="showEditModal(${JSON.stringify(t)})" class="text-sky-600 text-xs">Edit</button><button onclick="hapusTransaksi(${t.id})" class="text-red-500 text-xs ml-2">Hapus</button></td></tr>`
+                } else {
+                    html += `<tr class="border-b last:border-0"><td class="px-6 py-4">${formatDate(t.date)}</td><td class="px-6 py-4"><span class="px-3 py-1 bg-red-100 text-red-700 rounded-3xl text-xs">PENGELUARAN</span></td><td class="px-6 py-4">${t.description}</td><td class="px-6 py-4 text-right font-semibold text-red-600">${formatRupiah(t.amount)}</td><td class="px-6 py-4 text-center"><button onclick="showEditModal(${JSON.stringify(t)})" class="text-sky-600 text-xs">Edit</button><button onclick="hapusTransaksi(${t.id})" class="text-red-500 text-xs ml-2">Hapus</button></td></tr>`
+                }
+            })
+            html += `</tbody></table>`
+            document.getElementById('recent-table').innerHTML = html
+            renderMiniChart()
+        }
+
+        // ================== MINI CHART ==================
+        let miniChartInstance = null
+        function renderMiniChart() {
+            const ctx = document.getElementById('miniChart')
+            if (miniChartInstance) miniChartInstance.destroy()
+            const labels = [], incomeData = [], expenseData = []
+            const today = new Date()
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(today); d.setDate(d.getDate() - i)
+                const dateStr = d.toISOString().split('T')[0]
+                labels.push(d.getDate() + '/' + (d.getMonth()+1))
+                let inc = 0, exp = 0
+                transactions.forEach(t => {
+                    if (t.date === dateStr) {
+                        if (t.type === 'pemasukan') inc += t.profit || 0
+                        else exp += t.amount || 0
+                    }
+                })
+                incomeData.push(inc); expenseData.push(exp)
+            }
+            miniChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets: [{ label: 'Pemasukan', data: incomeData, borderColor: '#10b981', tension: 0.4, borderWidth: 3 }, { label: 'Pengeluaran', data: expenseData, borderColor: '#ef4444', tension: 0.4, borderWidth: 3 }] },
+                options: { plugins: { legend: { display: true, position: 'top' } }, scales: { y: { beginAtZero: true } } }
+            })
+        }
+
+        // ================== EDIT & HAPUS ==================
+        let currentEditId = null
+        function showEditModal(transaction) {
+            currentEditId = transaction.id
+            const modal = document.getElementById('edit-modal')
+            const content = document.getElementById('edit-content')
+            const title = document.getElementById('modal-title')
+            if (transaction.type === 'pemasukan') {
+                title.textContent = 'Edit Pemasukan'
+                content.innerHTML = `<div class="space-y-5"><div><label class="block text-sm mb-1">Tanggal</label><input id="edit-tgl" type="date" value="${transaction.date}" class="w-full px-4 py-3 border rounded-2xl"></div><div><label class="block text-sm mb-1">Harga Jual (Rp)</label><input id="edit-hargajual" type="number" value="${transaction.hargaJual || 0}" class="w-full px-4 py-3 border rounded-2xl"></div><div><label class="block text-sm mb-1">Profit (Rp)</label><input id="edit-profit" type="number" value="${transaction.profit}" class="w-full px-4 py-3 border rounded-2xl"></div><div class="flex gap-3"><button onclick="saveEdit()" class="flex-1 py-4 bg-emerald-500 text-white font-semibold rounded-3xl">Simpan Perubahan</button><button onclick="hideEditModal()" class="flex-1 py-4 border border-slate-300 rounded-3xl">Batal</button></div></div>`
+            } else {
+                title.textContent = 'Edit Pengeluaran'
+                content.innerHTML = `<div class="space-y-5"><div><label class="block text-sm mb-1">Tanggal</label><input id="edit-tgl" type="date" value="${transaction.date}" class="w-full px-4 py-3 border rounded-2xl"></div><div><label class="block text-sm mb-1">Jumlah (Rp)</label><input id="edit-amount" type="number" value="${transaction.amount}" class="w-full px-4 py-3 border rounded-2xl"></div><div class="flex gap-3"><button onclick="saveEdit()" class="flex-1 py-4 bg-emerald-500 text-white font-semibold rounded-3xl">Simpan Perubahan</button><button onclick="hideEditModal()" class="flex-1 py-4 border border-slate-300 rounded-3xl">Batal</button></div></div>`
+            }
+            modal.classList.remove('hidden')
+        }
+
+        function hideEditModal() {
+            document.getElementById('edit-modal').classList.add('hidden')
+            currentEditId = null
+        }
+
+        function saveEdit() {
+            const trx = transactions.find(t => t.id === currentEditId)
+            if (!trx) return
+            if (trx.type === 'pemasukan') {
+                trx.date = document.getElementById('edit-tgl').value
+                trx.hargaJual = parseInt(document.getElementById('edit-hargajual').value) || 0
+                trx.profit = parseInt(document.getElementById('edit-profit').value) || 0
+            } else {
+                trx.date = document.getElementById('edit-tgl').value
+                trx.amount = parseInt(document.getElementById('edit-amount').value) || 0
+            }
+            saveData()
+            hideEditModal()
+            renderDashboard()
+            renderLaporan()
+            alert('✅ Transaksi berhasil diedit!')
+        }
+
+        function hapusTransaksi(id) {
+            if (!confirm('Hapus transaksi ini?')) return
+            const trx = transactions.find(t => t.id === id)
+            if (trx && trx.type === 'pemasukan') {
+                stock += trx.diamonds || 0
+                stockHistory.unshift({ date: new Date().toISOString().split('T')[0], change: +(trx.diamonds || 0), note: `Hapus transaksi ${trx.buyer}` })
+            }
+            transactions = transactions.filter(t => t.id !== id)
+            saveData()
+            renderDashboard()
+            renderLaporan()
+        }
+
+        // ================== LAPORAN ==================
+        let mainChartInstance = null, pieChartInstance = null
+        function renderLaporan() {
+            const ctxMain = document.getElementById('mainChart')
+            if (mainChartInstance) mainChartInstance.destroy()
+            const monthly = {}
+            transactions.forEach(t => {
+                const month = t.date.substring(0, 7)
+                if (!monthly[month]) monthly[month] = { income: 0, expense: 0 }
+                if (t.type === 'pemasukan') monthly[month].income += t.profit || 0
+                else monthly[month].expense += t.amount || 0
+            })
+            const sortedMonths = Object.keys(monthly).sort().slice(-6)
+            const incArr = sortedMonths.map(m => monthly[m].income)
+            const expArr = sortedMonths.map(m => monthly[m].expense)
+            mainChartInstance = new Chart(ctxMain, { type: 'bar', data: { labels: sortedMonths, datasets: [{ label: 'Pemasukan', data: incArr, backgroundColor: '#10b981' }, { label: 'Pengeluaran', data: expArr, backgroundColor: '#ef4444' }] }, options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } } })
+
+            const ctxPie = document.getElementById('pieChart')
+            const calc = calculateSaldo()
+            if (pieChartInstance) pieChartInstance.destroy()
+            pieChartInstance = new Chart(ctxPie, { type: 'doughnut', data: { labels: ['Pemasukan', 'Pengeluaran'], datasets: [{ data: [calc.pemasukan, calc.pengeluaran], backgroundColor: ['#10b981', '#ef4444'], borderWidth: 5 }] }, options: { cutout: '75%', plugins: { legend: { position: 'bottom' } } } })
+
+            let tbody = ''
+            transactions.forEach(t => {
+                if (t.type === 'pemasukan') {
+                    tbody += `<tr class="hover:bg-slate-50"><td class="py-4 px-5">${formatDate(t.date)}</td><td><span class="px-3 py-px bg-emerald-100 text-emerald-700 text-xs rounded-3xl">PEMASUKAN</span></td><td>${t.diamonds} DM • ${t.buyer} (${t.reseller})</td><td class="text-right font-medium text-emerald-600">${formatRupiah(t.profit)}</td><td class="text-center"><button onclick="showEditModal(${JSON.stringify(t)})" class="text-sky-600 text-xs">✏️</button><button onclick="hapusTransaksi(${t.id})" class="text-red-500 text-xs ml-3">🗑️</button></td></tr>`
+                } else {
+                    tbody += `<tr class="hover:bg-slate-50"><td class="py-4 px-5">${formatDate(t.date)}</td><td><span class="px-3 py-px bg-red-100 text-red-700 text-xs rounded-3xl">PENGELUARAN</span></td><td>${t.description}</td><td class="text-right font-medium text-red-600">${formatRupiah(t.amount)}</td><td class="text-center"><button onclick="showEditModal(${JSON.stringify(t)})" class="text-sky-600 text-xs">✏️</button><button onclick="hapusTransaksi(${t.id})" class="text-red-500 text-xs ml-3">🗑️</button></td></tr>`
+                }
+            })
+            document.getElementById('table-body').innerHTML = tbody || `<tr><td colspan="5" class="text-center py-8 text-slate-400">Belum ada transaksi</td></tr>`
+        }
+
+        // ================== REKAP ==================
+        function getRekapHarianDanBulanan() {
+            const hariIni = new Date().toISOString().split('T')[0]
+            const bulanIni = hariIni.substring(0, 7)
+            let omsetHarian = 0, profitHarian = 0, pengeluaranHarian = 0, stokHarian = 0
+            let omsetBulanan = 0, profitBulanan = 0, pengeluaranBulanan = 0, stokBulanan = 0
+            const rekapHarianMap = {}
+            transactions.forEach(t => {
+                const tanggal = t.date
+                if (tanggal === hariIni) {
+                    if (t.type === 'pemasukan') { omsetHarian += Number(t.hargaJual || 0); profitHarian += Number(t.profit || 0); stokHarian += Number(t.diamonds || 0) } else pengeluaranHarian += Number(t.amount || 0)
+                }
+                if (tanggal.startsWith(bulanIni)) {
+                    if (t.type === 'pemasukan') { omsetBulanan += Number(t.hargaJual || 0); profitBulanan += Number(t.profit || 0); stokBulanan += Number(t.diamonds || 0) } else pengeluaranBulanan += Number(t.amount || 0)
+                }
+                if (!rekapHarianMap[tanggal]) rekapHarianMap[tanggal] = { omset: 0, profit: 0, pengeluaran: 0, stok: 0 }
+                if (t.type === 'pemasukan') {
+                    rekapHarianMap[tanggal].omset += Number(t.hargaJual || 0)
+                    rekapHarianMap[tanggal].profit += Number(t.profit || 0)
+                    rekapHarianMap[tanggal].stok += Number(t.diamonds || 0)
+                } else rekapHarianMap[tanggal].pengeluaran += Number(t.amount || 0)
+            })
+            return {
+                hariIni: { omset: omsetHarian, profit: profitHarian, pengeluaran: pengeluaranHarian, stok: stokHarian },
+                bulanIni: { omset: omsetBulanan, profit: profitBulanan, pengeluaran: pengeluaranBulanan, stok: stokBulanan },
+                rekap7Hari: Object.keys(rekapHarianMap).sort().reverse().slice(0, 7).map(tgl => ({ tanggal: tgl, ...rekapHarianMap[tgl] }))
+            }
+        }
+
+        function renderRekap() {
+            const rekap = getRekapHarianDanBulanan()
+            const hari = new Date()
+            document.getElementById('omset-harian').innerHTML = `<span class="text-blue-600">${formatRupiah(rekap.hariIni.omset)}</span>`
+            document.getElementById('profit-harian').innerHTML = `<span class="text-emerald-600">${formatRupiah(rekap.hariIni.profit)}</span>`
+            document.getElementById('pengeluaran-harian').innerHTML = `<span class="text-red-600">${formatRupiah(rekap.hariIni.pengeluaran)}</span>`
+            document.getElementById('stok-harian').innerHTML = `<span class="text-amber-600">${rekap.hariIni.stok} diamond</span>`
+            document.getElementById('omset-bulanan').innerHTML = `<span class="text-blue-600">${formatRupiah(rekap.bulanIni.omset)}</span>`
+            document.getElementById('profit-bulanan').innerHTML = `<span class="text-emerald-600">${formatRupiah(rekap.bulanIni.profit)}</span>`
+            document.getElementById('pengeluaran-bulanan').innerHTML = `<span class="text-red-600">${formatRupiah(rekap.bulanIni.pengeluaran)}</span>`
+            document.getElementById('stok-bulanan').innerHTML = `<span class="text-amber-600">${rekap.bulanIni.stok} diamond</span>`
+            let tbody = ''
+            rekap.rekap7Hari.forEach(r => {
+                tbody += `<tr class="border-b last:border-0 hover:bg-slate-50"><td class="py-4 px-5 font-medium">${formatDate(r.tanggal)}</td><td class="py-4 px-5 text-right font-semibold text-blue-600">${formatRupiah(r.omset)}</td><td class="py-4 px-5 text-right font-semibold text-emerald-600">${formatRupiah(r.profit)}</td><td class="py-4 px-5 text-right font-semibold text-red-600">${formatRupiah(r.pengeluaran)}</td><td class="py-4 px-5 text-right font-semibold text-amber-600">${r.stok} diamond</td></tr>`
+            })
+            document.getElementById('body-rekap-harian').innerHTML = tbody || `<tr><td colspan="5" class="text-center py-12 text-slate-400">Belum ada transaksi dalam 7 hari terakhir</td></tr>`
+        }
+
+        // ================== EXPORT / IMPORT ==================
+        function exportData() {
+            const data = { transactions, resellers, stock, stockHistory, exportedAt: new Date().toISOString() }
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `catatan-diamond-backup-${new Date().toISOString().slice(0,10)}.json`
+            a.click()
+        }
+
+        function importData() {
+            const input = document.createElement('input')
+            input.type = 'file'
+            input.accept = '.json'
+            input.onchange = e => {
+                const reader = new FileReader()
+                reader.onload = ev => {
+                    try {
+                        const imported = JSON.parse(ev.target.result)
+                        if (imported.transactions) transactions = imported.transactions
+                        if (imported.resellers) resellers = imported.resellers
+                        if (imported.stock !== undefined) stock = imported.stock
+                        if (imported.stockHistory) stockHistory = imported.stockHistory
+                        saveData()
+                        alert('✅ Data berhasil di-import!')
+                        location.reload()
+                    } catch(err) { alert('File tidak valid') }
+                }
+                reader.readAsText(e.target.files[0])
+            }
+            input.click()
+        }
+
+        // ================== INIT ==================
+        function init() {
+            initTailwind()
+            loadData()
+            populateResellerSelect()
+            const today = new Date().toISOString().split('T')[0]
+            if (document.getElementById('pemasukan-tgl')) document.getElementById('pemasukan-tgl').value = today
+            if (document.getElementById('pengeluaran-tgl')) document.getElementById('pengeluaran-tgl').value = today
+            renderDashboard()
+            renderStok()
+            renderReseller()
+            console.log('%c✅ Website Catatan Diamond – Responsif & UI Ramah!', 'color:#0ea5e9; font-size:14px; font-weight:bold')
+        }
+
+        window.onload = init
+    </script>
+</body>
+</html>
