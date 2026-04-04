@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Catatan Diamond • Lokal</title>
+    <title>Catatan Diamond Ara</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
@@ -16,7 +17,12 @@
         .sidebar { width: 100%; background: #0f172a; color: white; }
         @media (min-width: 1024px) { .sidebar { width: 280px; height: 100vh; } }
 
-        .content-area { flex: 1; overflow-y: auto; padding-bottom: 80px; background: #0f172a; }
+        .content-area { 
+            flex: 1; 
+            overflow-y: auto; 
+            background: #0f172a; 
+            padding-bottom: calc(92px + env(safe-area-inset-bottom)); 
+        }
         @media (min-width: 1024px) { .content-area { padding-bottom: 0; } }
 
         .header { background: #0f172a; color: white; height: 64px; }
@@ -27,23 +33,70 @@
             box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.3); 
         }
 
+        /* ================== BOTTOM NAV MOBILE - APPLE STYLE ================== */
         .bottom-nav {
-            position: fixed; bottom: 0; left: 0; right: 0;
-            background: rgba(15,23,42,0.95); backdrop-filter: blur(20px);
-            border-top: 1px solid #334155; z-index: 50;
-            padding: 8px 12px;
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            right: 0;
+            background: rgba(15,23,42,0.97); 
+            backdrop-filter: blur(28px);
+            border-top: 1px solid rgba(51,65,85,0.8); 
+            z-index: 50;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 8px 10px;
+            padding-bottom: calc(12px + env(safe-area-inset-bottom));
+            box-shadow: 0 -8px 30px -12px rgb(0 0 0 / 0.5);
         }
 
         .nav-item { 
-            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-            font-size: 10px; font-weight: 600; padding: 6px 0; border-radius: 9999px; transition: all 0.3s;
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            gap: 3px;
+            font-size: 10px; 
+            font-weight: 600; 
+            padding: 8px 4px;
+            border-radius: 16px; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color: #94a3b8;
+            min-height: 62px;
         }
-        .nav-item.active { color: #67e8f9; background: #1e2937; }
+        .nav-item.active { 
+            color: #67e8f9; 
+            background: rgba(103,232,249,0.15); 
+        }
+        .nav-item span:first-child { font-size: 23px; line-height: 1; }
+
+        .transaction-item { 
+            background: #1e2937; 
+            padding: 14px; 
+            border-radius: 16px; 
+        }
     </style>
 </head>
 <body class="bg-[#0f172a] text-white">
 
-<div class="main-layout">
+<!-- LOCK SCREEN -->
+<div id="lock-screen" class="fixed inset-0 bg-[#0f172a] flex items-center justify-center z-[9999]">
+    <div class="bg-[#1e2937] rounded-3xl p-8 w-96 max-w-md mx-4 text-center">
+        <div class="text-6xl mb-6">🔒</div>
+        <h2 class="text-3xl font-semibold mb-2">Catatan Diamond</h2>
+        <p class="text-slate-400 mb-8">Masukkan Password</p>
+        
+        <input type="password" id="password-input" placeholder="Password" 
+               class="w-full px-6 py-5 bg-slate-800 border border-slate-600 rounded-3xl text-center text-xl focus:outline-none focus:border-cyan-400 mb-6">
+        
+        <button onclick="handlePassword()" 
+                class="w-full py-4 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-3xl text-lg">Unlock</button>
+    </div>
+</div>
+
+<div class="main-layout" id="main-app" style="display:none">
 
     <!-- SIDEBAR DESKTOP -->
     <div class="sidebar hidden lg:flex flex-col border-r border-slate-700">
@@ -79,6 +132,7 @@
             <h2 id="page-title" class="text-2xl font-semibold">Dashboard</h2>
             <div class="flex items-center gap-6">
                 <button onclick="toggleTheme()" id="theme-toggle" class="text-2xl">☀️</button>
+                <button onclick="lockApp()" class="text-2xl">🔒</button>
                 <div class="flex items-center gap-2 text-emerald-400 text-sm font-medium">
                     <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
                     LOKAL
@@ -93,8 +147,8 @@
             <div id="dashboard" class="section active">
                 <div class="grid grid-cols-2 gap-4">
                     <div class="card p-6">
-                        <p class="text-slate-400 text-sm">Saldo Saat Ini</p>
-                        <p id="saldo-value" class="text-4xl font-semibold mt-3 text-emerald-400">Rp 0</p>
+                        <p class="text-slate-400 text-sm">Total Omset</p>
+                        <p id="omset-value" class="text-4xl font-semibold mt-3 text-cyan-400">Rp 0</p>
                     </div>
                     <div class="card p-6">
                         <p class="text-slate-400 text-sm">Total Pemasukan</p>
@@ -110,9 +164,10 @@
                     </div>
                 </div>
 
+                <!-- RIWAYAT TRANSAKSI TERBARU -->
                 <div class="mt-8 card p-6">
-                    <h3 class="font-semibold mb-4">Analisis 30 Hari Terakhir</h3>
-                    <canvas id="miniChart" class="h-64 w-full"></canvas>
+                    <h3 class="font-semibold mb-4">Riwayat Transaksi Terbaru</h3>
+                    <div id="recent-transactions" class="space-y-3 max-h-96 overflow-auto"></div>
                 </div>
             </div>
 
@@ -182,6 +237,16 @@
                 <div class="max-w-lg mx-auto card p-8">
                     <h2 class="text-2xl font-semibold mb-2">Stok Diamond Saat Ini</h2>
                     <div id="stok-besar" class="text-7xl font-bold text-amber-400 mb-8">0</div>
+                    
+                    <!-- FITUR EDIT STOK -->
+                    <div class="bg-slate-800 border border-slate-600 rounded-3xl p-6 mb-8">
+                        <h3 class="font-medium mb-4">Edit Jumlah Stok</h3>
+                        <div class="flex gap-4">
+                            <input type="number" id="edit-stok-jumlah" class="flex-1 px-5 py-4 bg-slate-700 border border-slate-600 rounded-3xl" placeholder="Masukkan stok baru">
+                            <button onclick="simpanEditStok()" class="px-10 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-3xl">Simpan Edit</button>
+                        </div>
+                    </div>
+
                     <div class="bg-slate-800 border border-slate-600 rounded-3xl p-6">
                         <h3 class="font-medium mb-4">Tambah Stok</h3>
                         <div class="flex gap-4">
@@ -239,12 +304,12 @@
 
 <!-- BOTTOM NAV MOBILE -->
 <div class="bottom-nav lg:hidden">
-    <button onclick="showSection('dashboard')" class="nav-item active" id="bottom-dashboard">🏠<br>Dashboard</button>
-    <button onclick="showSection('pemasukan')" class="nav-item" id="bottom-pemasukan">📥<br>Pemasukan</button>
-    <button onclick="showSection('pengeluaran')" class="nav-item" id="bottom-pengeluaran">📤<br>Pengeluaran</button>
-    <button onclick="showSection('stok')" class="nav-item" id="bottom-stok">📦<br>Stok</button>
-    <button onclick="showSection('reseller')" class="nav-item" id="bottom-reseller">👥<br>Reseller</button>
-    <button onclick="showSection('rekap')" class="nav-item" id="bottom-rekap">📅<br>Rekap</button>
+    <button onclick="showSection('dashboard')" class="nav-item active" id="bottom-dashboard"><span>🏠</span>Dashboard</button>
+    <button onclick="showSection('pemasukan')" class="nav-item" id="bottom-pemasukan"><span>📥</span>Pemasukan</button>
+    <button onclick="showSection('pengeluaran')" class="nav-item" id="bottom-pengeluaran"><span>📤</span>Pengeluaran</button>
+    <button onclick="showSection('stok')" class="nav-item" id="bottom-stok"><span>📦</span>Stok</button>
+    <button onclick="showSection('reseller')" class="nav-item" id="bottom-reseller"><span>👥</span>Reseller</button>
+    <button onclick="showSection('rekap')" class="nav-item" id="bottom-rekap"><span>📅</span>Rekap</button>
 </div>
 
 <!-- MODAL RESELLER -->
@@ -259,8 +324,113 @@
     </div>
 </div>
 
+<!-- MODAL EDIT PEMASUKAN -->
+<div id="modal-edit-pemasukan" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div onclick="event.stopImmediatePropagation()" class="bg-[#1e2937] rounded-3xl p-8 w-96 max-w-md mx-4">
+        <h3 class="text-xl font-semibold mb-6">Edit Pemasukan</h3>
+        <input type="hidden" id="edit-p-id">
+        <div class="space-y-6">
+            <input type="date" id="edit-p-tgl" class="w-full px-5 py-4 bg-slate-800 border border-slate-600 rounded-3xl">
+            <input type="text" id="edit-p-buyer" placeholder="Nama Pembeli" class="w-full px-5 py-4 bg-slate-800 border border-slate-600 rounded-3xl">
+            <input type="number" id="edit-p-hargajual" placeholder="Harga Jual" class="w-full px-5 py-4 bg-slate-800 border border-slate-600 rounded-3xl">
+            <input type="number" id="edit-p-profit" placeholder="Profit" class="w-full px-5 py-4 bg-slate-800 border border-slate-600 rounded-3xl">
+        </div>
+        <div class="flex gap-3 mt-8">
+            <button onclick="hideEditPemasukan()" class="flex-1 py-3 border border-slate-600 rounded-3xl">Batal</button>
+            <button onclick="simpanEditPemasukan()" class="flex-1 py-3 bg-cyan-500 text-white rounded-3xl">Simpan Perubahan</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL EDIT PENGELUARAN -->
+<div id="modal-edit-pengeluaran" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div onclick="event.stopImmediatePropagation()" class="bg-[#1e2937] rounded-3xl p-8 w-96 max-w-md mx-4">
+        <h3 class="text-xl font-semibold mb-6">Edit Pengeluaran</h3>
+        <input type="hidden" id="edit-pg-id">
+        <div class="space-y-6">
+            <input type="date" id="edit-pg-tgl" class="w-full px-5 py-4 bg-slate-800 border border-slate-600 rounded-3xl">
+            <input type="number" id="edit-pg-jumlah" placeholder="Jumlah" class="w-full px-5 py-4 bg-slate-800 border border-slate-600 rounded-3xl">
+            <input type="text" id="edit-pg-keterangan" placeholder="Keterangan" class="w-full px-5 py-4 bg-slate-800 border border-slate-600 rounded-3xl">
+        </div>
+        <div class="flex gap-3 mt-8">
+            <button onclick="hideEditPengeluaran()" class="flex-1 py-3 border border-slate-600 rounded-3xl">Batal</button>
+            <button onclick="simpanEditPengeluaran()" class="flex-1 py-3 bg-cyan-500 text-white rounded-3xl">Simpan Perubahan</button>
+        </div>
+    </div>
+</div>
+
 <script>
-// ================== THEME & DATA (semua lengkap) ==================
+
+const PASSWORD_HASH = "f719b3f4709ad2b66618f276f724e3eba542d7587190b2f90fed6325bd8f14e5";
+let masterPassword = "";
+
+const ENCRYPTED_KEY = 'diamond_catatan_pro';
+
+function encryptData(data) {
+    return CryptoJS.AES.encrypt(JSON.stringify(data), masterPassword).toString();
+}
+
+function decryptData(ciphertext) {
+    try {
+        const bytes = CryptoJS.AES.decrypt(ciphertext, masterPassword);
+        return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+    } catch(e) {
+        return null;
+    }
+}
+
+function saveEncryptedData() {
+    const dataToSave = { transactions, resellers, stock, stockHistory };
+    const encrypted = encryptData(dataToSave);
+    localStorage.setItem(ENCRYPTED_KEY, encrypted);
+}
+
+function loadEncryptedData() {
+    const encrypted = localStorage.getItem(ENCRYPTED_KEY);
+    if (!encrypted) return false;
+    const decrypted = decryptData(encrypted);
+    if (!decrypted) return false;
+    transactions = decrypted.transactions || [];
+    resellers = decrypted.resellers || ["Default Reseller", "Reseller A", "Reseller B"];
+    stock = decrypted.stock || 500;
+    stockHistory = decrypted.stockHistory || [];
+    return true;
+}
+
+// Lock Screen
+function showLockScreen() {
+    document.getElementById('lock-screen').style.display = 'flex';
+    document.getElementById('main-app').style.display = 'none';
+    document.getElementById('password-input').value = '';
+}
+
+function handlePassword() {
+    const input = document.getElementById('password-input').value.trim();
+    const inputHash = CryptoJS.SHA256(input).toString(CryptoJS.enc.Hex);
+    
+    if (inputHash === PASSWORD_HASH) {
+        masterPassword = input;
+        if (loadEncryptedData()) {
+            document.getElementById('lock-screen').style.display = 'none';
+            document.getElementById('main-app').style.display = 'flex';
+            init();
+        } else {
+            document.getElementById('lock-screen').style.display = 'none';
+            document.getElementById('main-app').style.display = 'flex';
+            init();
+        }
+    } else {
+        alert('Password salah!');
+        document.getElementById('password-input').value = '';
+    }
+}
+
+function lockApp() {
+    saveEncryptedData();
+    showLockScreen();
+}
+
+// ================== THEME & DATA ==================
 function loadTheme() {
     if (localStorage.getItem('theme') === 'light') document.documentElement.classList.remove('dark');
     updateThemeIcon();
@@ -274,23 +444,8 @@ function updateThemeIcon() {
     document.getElementById('theme-toggle').textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
 }
 
-// ================== DATA & LOCALSTORAGE ==================
+// ================== DATA ==================
 let transactions = [], resellers = ["Default Reseller", "Reseller A", "Reseller B"], stock = 500, stockHistory = [];
-const STORAGE_KEY = 'diamond_catatan_pro';
-
-function loadData() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-        const data = JSON.parse(saved);
-        transactions = data.transactions || [];
-        resellers = data.resellers || resellers;
-        stock = data.stock || stock;
-        stockHistory = data.stockHistory || [];
-    }
-}
-function saveData() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ transactions, resellers, stock, stockHistory }));
-}
 
 // ================== HELPER ==================
 function formatRupiah(num) { return 'Rp ' + Number(num).toLocaleString('id-ID'); }
@@ -305,6 +460,9 @@ function calculateSaldo() {
         else pengeluaran += Number(t.amount || 0);
     });
     return { saldo: pemasukan - pengeluaran, pemasukan, pengeluaran };
+}
+function calculateOmset() {
+    return transactions.filter(t => t.type === 'pemasukan').reduce((sum, t) => sum + Number(t.hargaJual || 0), 0);
 }
 
 // ================== NAVIGASI ==================
@@ -327,7 +485,38 @@ function showSection(section) {
     if (section === 'rekap') renderRekap();
 }
 
-// ================== FUNGSI LAIN (SEMUA LENGKAP) ==================
+// ================== RENDER DASHBOARD & RIWAYAT ==================
+function renderDashboard() {
+    document.getElementById('omset-value').innerHTML = formatRupiah(calculateOmset());
+    const calc = calculateSaldo();
+    document.getElementById('total-pemasukan').innerHTML = formatRupiah(calc.pemasukan);
+    document.getElementById('total-pengeluaran').innerHTML = formatRupiah(calc.pengeluaran);
+    document.getElementById('stok-value').textContent = stock;
+    renderRecentTransactions();
+}
+
+function renderRecentTransactions() {
+    const container = document.getElementById('recent-transactions');
+    let html = '';
+    const sorted = [...transactions].sort((a,b) => b.id - a.id).slice(0, 10);
+    sorted.forEach(t => {
+        const isPemasukan = t.type === 'pemasukan';
+        html += `
+            <div class="transaction-item flex justify-between items-center">
+                <div>
+                    <span class="${isPemasukan ? 'text-emerald-400' : 'text-red-400'} font-medium">${isPemasukan ? '📥' : '📤'} ${isPemasukan ? t.buyer : t.description}</span><br>
+                    <span class="text-xs text-slate-400">${formatDate(t.date)}</span>
+                </div>
+                <div class="text-right">
+                    <span class="font-semibold ${isPemasukan ? 'text-cyan-400' : 'text-red-400'}">${isPemasukan ? formatRupiah(t.hargaJual) : formatRupiah(t.amount)}</span><br>
+                    <button onclick="${isPemasukan ? `editPemasukan(${t.id})` : `editPengeluaran(${t.id})`}" class="text-cyan-400 text-xs">Edit</button>
+                </div>
+            </div>`;
+    });
+    container.innerHTML = html || '<p class="text-slate-400 text-center py-8">Belum ada transaksi</p>';
+}
+
+// ================== FUNGSI LAIN ==================
 function populateResellerSelect() {
     const select = document.getElementById('pemasukan-reseller');
     select.innerHTML = '';
@@ -339,7 +528,6 @@ function populateResellerSelect() {
 }
 
 function simpanPemasukan() {
-    // (logika lengkap seperti sebelumnya)
     const tgl = document.getElementById('pemasukan-tgl').value;
     const reseller = document.getElementById('pemasukan-reseller').value;
     const diamonds = parseInt(document.getElementById('pemasukan-diamond').value) || 0;
@@ -354,7 +542,7 @@ function simpanPemasukan() {
     stockHistory.unshift({ date: tgl, change: -diamonds, note: `Penjualan ke ${buyer}` });
 
     transactions.unshift({ id: Date.now(), type: 'pemasukan', date: tgl, reseller, diamonds, buyer: buyer || '-', profit, hargaJual });
-    saveData();
+    saveEncryptedData();
     alert('✅ Pemasukan tersimpan!');
     renderDashboard();
     renderStok();
@@ -366,7 +554,7 @@ function simpanPengeluaran() {
     const keterangan = document.getElementById('pengeluaran-keterangan').value.trim();
     if (!tgl || jumlah <= 0) return alert('Isi tanggal dan jumlah!');
     transactions.unshift({ id: Date.now(), type: 'pengeluaran', date: tgl, amount: jumlah, description: keterangan });
-    saveData();
+    saveEncryptedData();
     alert('✅ Pengeluaran tersimpan!');
     renderDashboard();
 }
@@ -376,7 +564,7 @@ function tambahStok() {
     if (jumlah <= 0) return alert('Masukkan jumlah > 0');
     stock += jumlah;
     stockHistory.unshift({ date: new Date().toISOString().split('T')[0], change: +jumlah, note: 'Restock' });
-    saveData();
+    saveEncryptedData();
     renderStok();
     alert(`✅ Stok +${jumlah}`);
 }
@@ -399,7 +587,7 @@ function renderReseller() {
 function hapusReseller(i) {
     if (confirm('Hapus?')) {
         resellers.splice(i, 1);
-        saveData();
+        saveEncryptedData();
         renderReseller();
         populateResellerSelect();
     }
@@ -409,7 +597,7 @@ function tambahResellerSekarang() {
     const nama = prompt('Nama reseller baru:');
     if (nama && !resellers.includes(nama.trim())) {
         resellers.push(nama.trim());
-        saveData();
+        saveEncryptedData();
         populateResellerSelect();
         renderReseller();
     }
@@ -425,45 +613,99 @@ function simpanResellerModal() {
     const nama = document.getElementById('modal-reseller-input').value.trim();
     if (nama) {
         if (!resellers.includes(nama)) resellers.push(nama);
-        saveData();
+        saveEncryptedData();
         renderReseller();
         populateResellerSelect();
     }
     hideModal();
 }
 
-function renderDashboard() {
-    const calc = calculateSaldo();
-    document.getElementById('saldo-value').innerHTML = formatRupiah(calc.saldo);
-    document.getElementById('total-pemasukan').innerHTML = formatRupiah(calc.pemasukan);
-    document.getElementById('total-pengeluaran').innerHTML = formatRupiah(calc.pengeluaran);
-    document.getElementById('stok-value').textContent = stock;
-    renderMiniChart();
-}
-
-let miniChartInstance = null;
-function renderMiniChart() {
-    const ctx = document.getElementById('miniChart');
-    if (miniChartInstance) miniChartInstance.destroy();
-    // Chart logic (sama seperti sebelumnya)
-    miniChartInstance = new Chart(ctx, { type: 'line', data: { labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'], datasets: [{ label: 'Pemasukan', data: [120000, 80000, 150000, 90000, 200000, 0, 50000], borderColor: '#34d399' }, { label: 'Pengeluaran', data: [20000, 30000, 10000, 40000, 15000, 0, 25000], borderColor: '#f87171' }] }, options: { plugins: { legend: { position: 'top' } } } });
-}
-
 function renderRekap() {
-    // Logika rekap lengkap
     document.getElementById('omset-harian').innerHTML = formatRupiah(30000);
     document.getElementById('profit-harian').innerHTML = formatRupiah(30000);
-    // dst (bisa diisi data dummy atau real)
 }
 
-function resetData() { if (confirm('Reset semua data?')) { localStorage.removeItem(STORAGE_KEY); location.reload(); } }
+// ================== EDIT PEMASUKAN ==================
+function editPemasukan(id) {
+    const tx = transactions.find(t => t.id === id);
+    if (!tx) return;
+    document.getElementById('edit-p-id').value = id;
+    document.getElementById('edit-p-tgl').value = tx.date;
+    document.getElementById('edit-p-buyer').value = tx.buyer;
+    document.getElementById('edit-p-hargajual').value = tx.hargaJual;
+    document.getElementById('edit-p-profit').value = tx.profit;
+    document.getElementById('modal-edit-pemasukan').classList.remove('hidden');
+}
+function hideEditPemasukan() {
+    document.getElementById('modal-edit-pemasukan').classList.add('hidden');
+}
+function simpanEditPemasukan() {
+    const id = parseInt(document.getElementById('edit-p-id').value);
+    const tx = transactions.find(t => t.id === id);
+    if (tx) {
+        tx.date = document.getElementById('edit-p-tgl').value;
+        tx.buyer = document.getElementById('edit-p-buyer').value;
+        tx.hargaJual = parseInt(document.getElementById('edit-p-hargajual').value) || 0;
+        tx.profit = parseInt(document.getElementById('edit-p-profit').value) || 0;
+        saveEncryptedData();
+        renderDashboard();
+        alert('✅ Pemasukan diedit!');
+    }
+    hideEditPemasukan();
+}
+
+// ================== EDIT PENGELUARAN ==================
+function editPengeluaran(id) {
+    const tx = transactions.find(t => t.id === id);
+    if (!tx) return;
+    document.getElementById('edit-pg-id').value = id;
+    document.getElementById('edit-pg-tgl').value = tx.date;
+    document.getElementById('edit-pg-jumlah').value = tx.amount;
+    document.getElementById('edit-pg-keterangan').value = tx.description || '';
+    document.getElementById('modal-edit-pengeluaran').classList.remove('hidden');
+}
+function hideEditPengeluaran() {
+    document.getElementById('modal-edit-pengeluaran').classList.add('hidden');
+}
+function simpanEditPengeluaran() {
+    const id = parseInt(document.getElementById('edit-pg-id').value);
+    const tx = transactions.find(t => t.id === id);
+    if (tx) {
+        tx.date = document.getElementById('edit-pg-tgl').value;
+        tx.amount = parseInt(document.getElementById('edit-pg-jumlah').value) || 0;
+        tx.description = document.getElementById('edit-pg-keterangan').value;
+        saveEncryptedData();
+        renderDashboard();
+        alert('✅ Pengeluaran diedit!');
+    }
+    hideEditPengeluaran();
+}
+
+// ================== EDIT STOK ==================
+function simpanEditStok() {
+    const newStock = parseInt(document.getElementById('edit-stok-jumlah').value);
+    if (isNaN(newStock)) return alert('Masukkan angka!');
+    if (confirm(`Ubah stok menjadi ${newStock}?`)) {
+        stock = newStock;
+        saveEncryptedData();
+        renderStok();
+        renderDashboard();
+        alert('✅ Stok telah diedit!');
+    }
+}
+
+function resetData() { 
+    if (confirm('Reset semua data?')) { 
+        localStorage.removeItem(ENCRYPTED_KEY); 
+        location.reload(); 
+    } 
+}
 function exportData() { /* logika lengkap */ }
 function importData() { /* logika lengkap */ }
 
 // ================== INIT ==================
 function init() {
     loadTheme();
-    loadData();
     populateResellerSelect();
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('pemasukan-tgl').value = today;
@@ -471,7 +713,10 @@ function init() {
     showSection('dashboard');
 }
 
-window.onload = init;
+// ================== START ==================
+window.onload = function() {
+    showLockScreen();
+};
 </script>
 </body>
 </html>
